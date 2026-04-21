@@ -1,3 +1,8 @@
+use crate::cli::Args;
+use clap::Parser;
+
+mod cli;
+
 fn main() {
-    println!("Hello, world!");
+    let _args = Args::parse();
 }
