@@ -14,11 +14,11 @@ pub struct ExpenseRow {
 }
 
 pub struct SqlRepository {
-    connection: Rc<Connection>,
+    connection: Connection,
 }
 
 impl SqlRepository {
-    pub fn try_new(connection: Rc<Connection>) -> Result<Self> {
+    pub fn try_new(connection: Connection) -> Result<Self> {
         rusqlite::vtab::array::load_module(&connection)
             .with_context(|| "failed to load rarray sqlite module")?;
 
@@ -152,7 +152,7 @@ mod tests {
 
     #[test]
     fn test_create_new_expense() -> Result<()> {
-        let connection = Rc::new(Connection::open_in_memory()?);
+        let connection = Connection::open_in_memory()?;
         let sql_repository = SqlRepository::try_new(connection)?;
 
         sql_repository.create_expenses_table()?;
@@ -182,7 +182,7 @@ mod tests {
 
     #[test]
     fn test_mark_expense_as_deleted() -> Result<()> {
-        let connection = Rc::new(Connection::open_in_memory()?);
+        let connection = Connection::open_in_memory()?;
         let sql_repository = SqlRepository::try_new(connection)?;
 
         sql_repository.create_expenses_table()?;
@@ -241,7 +241,7 @@ mod tests {
 
     #[test]
     fn test_expense_uniqueness() -> Result<()> {
-        let connection = Rc::new(Connection::open_in_memory()?);
+        let connection = Connection::open_in_memory()?;
         let sql_repository = SqlRepository::try_new(connection)?;
 
         sql_repository.create_expenses_table()?;
