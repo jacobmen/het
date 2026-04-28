@@ -7,18 +7,18 @@ use clap::{Parser, Subcommand};
 pub struct Args {
     /// Override default DB path
     #[arg(long, value_name = "DB", default_value = "het.db")]
-    db: Option<PathBuf>,
+    pub db: PathBuf,
 
     /// Dry-run operation without any state changes
     #[arg(short, long)]
-    dryrun: bool,
+    pub dryrun: bool,
 
     #[command(subcommand)]
-    command: Commands,
+    pub command: Commands,
 }
 
 #[derive(Subcommand, Debug)]
-enum Commands {
+pub enum Commands {
     /// Add a health expense to the tracker
     Add {
         /// Expense file to ingest
