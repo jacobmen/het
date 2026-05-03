@@ -17,6 +17,23 @@ pub struct SqlRepository {
     connection: Connection,
 }
 
+pub trait Repository {
+    fn create_expense_table(&self) -> Result<()>;
+
+    fn get_all_expenses(&self) -> Result<Vec<ExpenseRow>>;
+
+    fn create_new_expense(
+        &self,
+        name: String,
+        file_data_type: String,
+        expense_date: String,
+        unit_amount: i64,
+        compressed_file_data: Vec<u8>,
+    ) -> Result<()>;
+
+    fn mark_expenses_as_deleted(&self, expense_ids: &[i64]) -> Result<()>;
+}
+
 impl SqlRepository {
     pub fn try_new(connection: Connection) -> Result<Self> {
         rusqlite::vtab::array::load_module(&connection)
@@ -24,8 +41,10 @@ impl SqlRepository {
 
         Ok(SqlRepository { connection })
     }
+}
 
-    pub fn create_expenses_table(&self) -> Result<()> {
+impl Repository for SqlRepository {
+    fn create_expense_table(&self) -> Result<()> {
         self.connection.execute_batch(
             "CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -43,7 +62,7 @@ impl SqlRepository {
         Ok(())
     }
 
-    pub fn get_all_expenses(&self) -> Result<Vec<ExpenseRow>> {
+    fn get_all_expenses(&self) -> Result<Vec<ExpenseRow>> {
         let mut stmt = self
             .connection
             .prepare(
@@ -80,7 +99,7 @@ impl SqlRepository {
             .with_context(|| "failed to build expense row")
     }
 
-    pub fn create_new_expense(
+    fn create_new_expense(
         &self,
         name: String,
         file_data_type: String,
@@ -118,7 +137,7 @@ impl SqlRepository {
         }
     }
 
-    pub fn mark_expenses_as_deleted(&self, expense_ids: &[i64]) -> Result<()> {
+    fn mark_expenses_as_deleted(&self, expense_ids: &[i64]) -> Result<()> {
         let bind_values = Rc::new(
             expense_ids
                 .iter()
@@ -155,7 +174,7 @@ mod tests {
         let connection = Connection::open_in_memory()?;
         let sql_repository = SqlRepository::try_new(connection)?;
 
-        sql_repository.create_expenses_table()?;
+        sql_repository.create_expense_table()?;
 
         sql_repository.create_new_expense(
             "exp1".to_string(),
@@ -185,7 +204,7 @@ mod tests {
         let connection = Connection::open_in_memory()?;
         let sql_repository = SqlRepository::try_new(connection)?;
 
-        sql_repository.create_expenses_table()?;
+        sql_repository.create_expense_table()?;
 
         sql_repository.create_new_expense(
             "exp1".to_string(),
@@ -244,7 +263,7 @@ mod tests {
         let connection = Connection::open_in_memory()?;
         let sql_repository = SqlRepository::try_new(connection)?;
 
-        sql_repository.create_expenses_table()?;
+        sql_repository.create_expense_table()?;
 
         sql_repository.create_new_expense(
             "exp1".to_string(),
