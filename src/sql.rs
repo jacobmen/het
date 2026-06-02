@@ -24,11 +24,11 @@ pub trait Repository {
 
     fn create_new_expense(
         &self,
-        name: String,
-        file_data_type: String,
-        expense_date: String,
+        name: &str,
+        file_data_type: &str,
+        expense_date: &str,
         unit_amount: i64,
-        compressed_file_data: Vec<u8>,
+        compressed_file_data: &[u8],
     ) -> Result<()>;
 
     fn mark_expenses_as_deleted(&self, expense_ids: &[i64]) -> Result<()>;
@@ -101,11 +101,11 @@ impl Repository for SqlRepository {
 
     fn create_new_expense(
         &self,
-        name: String,
-        file_data_type: String,
-        expense_date: String,
+        name: &str,
+        file_data_type: &str,
+        expense_date: &str,
         unit_amount: i64,
-        compressed_file_data: Vec<u8>,
+        compressed_file_data: &[u8],
     ) -> Result<()> {
         let inserted = self.connection.execute(
             "INSERT INTO expenses (
@@ -177,11 +177,11 @@ mod tests {
         sql_repository.create_expense_table()?;
 
         sql_repository.create_new_expense(
-            "exp1".to_string(),
-            "pdf".to_string(),
-            "2025-01-01".to_string(),
+            &"exp1".to_string(),
+            &"pdf".to_string(),
+            &"2025-01-01".to_string(),
             2000,
-            vec![0x1, 0x1],
+            &vec![0x1, 0x1],
         )?;
 
         let expenses = sql_repository.get_all_expenses()?;
@@ -207,25 +207,25 @@ mod tests {
         sql_repository.create_expense_table()?;
 
         sql_repository.create_new_expense(
-            "exp1".to_string(),
-            "pdf".to_string(),
-            "2025-01-01".to_string(),
+            &"exp1".to_string(),
+            &"pdf".to_string(),
+            &"2025-01-01".to_string(),
             2000,
-            vec![0x1, 0x1],
+            &vec![0x1, 0x1],
         )?;
         sql_repository.create_new_expense(
-            "exp2".to_string(),
-            "png".to_string(),
-            "2026-01-01".to_string(),
+            &"exp2".to_string(),
+            &"png".to_string(),
+            &"2026-01-01".to_string(),
             1000,
-            vec![0xa, 0xb, 0xc],
+            &vec![0xa, 0xb, 0xc],
         )?;
         sql_repository.create_new_expense(
-            "exp3".to_string(),
-            "jpeg".to_string(),
-            "2026-06-01".to_string(),
+            &"exp3".to_string(),
+            &"jpeg".to_string(),
+            &"2026-06-01".to_string(),
             1500,
-            vec![0x1, 0x2, 0x3],
+            &vec![0x1, 0x2, 0x3],
         )?;
 
         let expenses = sql_repository.get_all_expenses()?;
@@ -266,21 +266,21 @@ mod tests {
         sql_repository.create_expense_table()?;
 
         sql_repository.create_new_expense(
-            "exp1".to_string(),
-            "pdf".to_string(),
-            "2025-01-01".to_string(),
+            &"exp1".to_string(),
+            &"pdf".to_string(),
+            &"2025-01-01".to_string(),
             2000,
-            vec![0x1, 0x1],
+            &vec![0x1, 0x1],
         )?;
 
         assert!(
             sql_repository
                 .create_new_expense(
-                    "exp1".to_string(),
-                    "pdf".to_string(),
-                    "2025-01-01".to_string(),
+                    &"exp1".to_string(),
+                    &"pdf".to_string(),
+                    &"2025-01-01".to_string(),
                     2000,
-                    vec![0x1, 0x1],
+                    &vec![0x1, 0x1],
                 )
                 .is_err()
         );

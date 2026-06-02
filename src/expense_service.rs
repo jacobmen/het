@@ -66,18 +66,18 @@ impl<R: Repository> ExpenseService<R> {
 
     pub fn create_new_expense(
         &self,
-        name: ExpenseName,
-        file_data_type: FileDataType,
-        expense_date: NaiveDate,
+        name: &ExpenseName,
+        file_data_type: &FileDataType,
+        expense_date: &NaiveDate,
         unit_amount: ExpenseUnitAmount,
-        compressed_file_data: ExpenseFileData,
+        compressed_file_data: &ExpenseFileData,
     ) -> Result<()> {
         self.repository.create_new_expense(
-            name.0,
-            file_data_type.0,
-            expense_date.format("%Y-%m-%d").to_string(),
+            &name.0,
+            &file_data_type.0,
+            &expense_date.format("%Y-%m-%d").to_string(),
             unit_amount.0,
-            compressed_file_data.0,
+            &compressed_file_data.0,
         )
     }
 
@@ -114,11 +114,11 @@ mod tests {
 
         fn create_new_expense(
             &self,
-            name: String,
-            file_data_type: String,
-            expense_date: String,
+            name: &str,
+            file_data_type: &str,
+            expense_date: &str,
             unit_amount: i64,
-            compressed_file_data: Vec<u8>,
+            compressed_file_data: &[u8],
         ) -> Result<()> {
             assert_eq!("expense", name);
             assert_eq!("pdf", file_data_type);
@@ -162,11 +162,11 @@ mod tests {
         let expense_service = ExpenseService::new(TestRepository {});
 
         expense_service.create_new_expense(
-            ExpenseName("expense".to_string()),
-            FileDataType("pdf".to_string()),
-            NaiveDate::from_ymd_opt(2026, 1, 7).unwrap(),
+            &ExpenseName("expense".to_string()),
+            &FileDataType("pdf".to_string()),
+            &NaiveDate::from_ymd_opt(2026, 1, 7).unwrap(),
             ExpenseUnitAmount(2000),
-            ExpenseFileData(vec![0x1]),
+            &ExpenseFileData(vec![0x1]),
         )?;
 
         Ok(())
