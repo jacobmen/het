@@ -4,19 +4,19 @@ use chrono::NaiveDate;
 use crate::sql::Repository;
 
 #[derive(PartialEq, Debug)]
-pub struct ExpenseId(i64);
+pub struct ExpenseId(pub i64);
 
 #[derive(PartialEq, Debug)]
-pub struct ExpenseName(String);
+pub struct ExpenseName(pub String);
 
 #[derive(PartialEq, Debug)]
-pub struct FileDataType(String);
+pub struct FileDataType(pub String);
 
 #[derive(PartialEq, Debug)]
-pub struct ExpenseUnitAmount(i64);
+pub struct ExpenseUnitAmount(pub i64);
 
 #[derive(PartialEq, Debug)]
-pub struct ExpenseFileData(Vec<u8>);
+pub struct ExpenseFileData(pub Vec<u8>);
 
 pub struct Expense {
     pub id: ExpenseId,

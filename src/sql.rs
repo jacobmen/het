@@ -45,6 +45,10 @@ impl SqlRepository {
 
 impl Repository for SqlRepository {
     fn create_expense_table(&self) -> Result<()> {
+        if self.connection.table_exists(None, "expenses")? {
+            return Ok(());
+        }
+
         self.connection.execute_batch(
             "CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -56,7 +60,7 @@ impl Repository for SqlRepository {
                 is_deleted INTEGER NOT NULL DEFAULT 0 CHECK (is_deleted IN (0, 1)),
                 UNIQUE(name, file_data_type, expense_date, unit_amount)
             );
-            CREATE INDEX idx_expenses_is_deleted ON expenses(is_deleted);",
+            CREATE INDEX IF NOT EXISTS idx_expenses_is_deleted ON expenses(is_deleted);",
         )?;
 
         Ok(())
