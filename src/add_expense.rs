@@ -58,10 +58,7 @@ pub fn add_expense<R: Repository>(
     println!("Created expense");
     println!("\texpense=`{}`", expense_name);
     println!("\tfile_data_type=`{}`", file_data_type);
-    println!(
-        "\texpense_date=`{}`",
-        expense_date.format("%Y-%m-%d").to_string()
-    );
+    println!("\texpense_date=`{}`", expense_date.format("%Y-%m-%d"));
     println!("\tunit_amount=`{}`", unit_amount);
     println!("\tcompressed_data_size=`{}`", compressed_file_data.0.len());
 

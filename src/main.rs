@@ -1,10 +1,6 @@
-use std::path::PathBuf;
-
 use crate::{
-    add_expense::add_expense,
-    cli::Args,
-    expense_service::ExpenseService,
-    sql::{Repository, SqlRepository},
+    add_expense::add_expense, cli::Args, expense_service::ExpenseService,
+    retrieve_expenses::retrieve_expenses, sql::SqlRepository,
 };
 use anyhow::{Context, Result};
 use clap::Parser;
@@ -13,6 +9,7 @@ use rusqlite::Connection;
 mod add_expense;
 mod cli;
 mod expense_service;
+mod retrieve_expenses;
 mod sql;
 
 fn main() -> Result<()> {
@@ -33,18 +30,9 @@ fn main() -> Result<()> {
         }
         cli::Commands::Retrieve { amount, out } => {
             retrieve_expenses(&expense_service, args.dryrun, amount, &out)
-                .with_context(|| format!("failed to retrieve expenses"))?
+                .with_context(|| "failed to retrieve expenses".to_string())?
         }
     }
 
-    Ok(())
-}
-
-fn retrieve_expenses<R: Repository>(
-    expense_service: &ExpenseService<R>,
-    dryrun: bool,
-    amount: f64,
-    out_path: &PathBuf,
-) -> Result<()> {
     Ok(())
 }
