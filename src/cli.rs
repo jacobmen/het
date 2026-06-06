@@ -38,7 +38,7 @@ pub enum Commands {
 
         /// Output path of expense files
         #[arg(short, long, value_name = "OUT_PATH", default_value = ".")]
-        out: Option<PathBuf>,
+        out: PathBuf,
     },
 }
 
