@@ -3,21 +3,22 @@ use chrono::NaiveDate;
 
 use crate::sql::Repository;
 
-#[derive(PartialEq, Debug)]
+#[derive(Eq, PartialOrd, Ord, PartialEq, Debug, Clone, Copy)]
 pub struct ExpenseId(pub i64);
 
-#[derive(PartialEq, Debug)]
+#[derive(Eq, PartialOrd, Ord, PartialEq, Debug)]
 pub struct ExpenseName(pub String);
 
-#[derive(PartialEq, Debug)]
+#[derive(Eq, PartialOrd, Ord, PartialEq, Debug)]
 pub struct FileDataType(pub String);
 
-#[derive(PartialEq, Debug)]
+#[derive(Eq, PartialOrd, Ord, PartialEq, Debug)]
 pub struct ExpenseUnitAmount(pub i64);
 
 #[derive(PartialEq, Debug)]
 pub struct ExpenseFileData(pub Vec<u8>);
 
+#[derive(PartialEq, Debug)]
 pub struct Expense {
     pub id: ExpenseId,
     pub name: ExpenseName,

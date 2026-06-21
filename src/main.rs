@@ -7,6 +7,7 @@ use clap::Parser;
 use rusqlite::Connection;
 
 mod add_expense;
+mod algo;
 mod cli;
 mod expense_service;
 mod retrieve_expenses;
@@ -23,6 +24,7 @@ fn main() -> Result<()> {
 
     expense_service.create_expense_table()?;
 
+    // TODO: replace dryrun flag with dryrun repository for abstraction
     match args.command {
         cli::Commands::Add { file, amount } => {
             add_expense(&expense_service, args.dryrun, &file, amount)
