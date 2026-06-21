@@ -3,53 +3,55 @@ use anyhow::{Result, anyhow};
 
 pub fn closest_subset_to_target(expenses: &[Expense], target: u64) -> Result<Vec<&Expense>> {
     if expenses.is_empty() {
-        return Ok(vec![]);
+        return Ok(Vec::new());
     }
 
     let max_value = expenses
         .iter()
-        .max_by_key(|e| &e.unit_amount)
-        .ok_or(anyhow!("failed to extract unit amount"))?
-        .unit_amount
-        .0 as u64;
+        .map(|e| e.unit_amount.0 as usize)
+        .max()
+        .ok_or_else(|| anyhow!("failed to extract max unit value"))?;
+
+    let target = target as usize;
     let limit = target + max_value;
 
-    let mut parent: Vec<Option<usize>> = vec![None; (limit + 1) as usize];
-    parent[0] = Some(0);
+    let mut parent: Vec<Option<usize>> = vec![None; limit + 1];
+    parent[0] = Some(usize::MAX);
 
     for (idx, expense) in expenses.iter().enumerate() {
         let val = expense.unit_amount.0 as usize;
 
-        for i in (val..=limit.try_into()?).rev() {
+        for i in (val..=limit).rev() {
             if parent[i - val].is_some() && parent[i].is_none() {
                 parent[i] = Some(idx);
             }
         }
     }
 
-    let best_sum_option = (target..=limit).find(|i| parent[*i as usize].is_some());
+    let best_sum_option = (target..=limit).find(|i| parent[*i].is_some());
 
     let best_sum = match best_sum_option {
         Some(bs) => bs,
         None => return Ok(vec![]),
     };
 
-    let mut chosen_indices = Vec::new();
-    let mut curr = best_sum as usize;
+    let mut chosen_expenses = Vec::new();
+    let mut curr = best_sum;
 
     while curr > 0 {
-        let idx = parent[curr].unwrap();
-        chosen_indices.push(idx);
-        curr -= expenses[idx].unit_amount.0 as usize;
+        if let Some(idx) = parent[curr] {
+            if idx == usize::MAX {
+                break;
+            }
+
+            chosen_expenses.push(&expenses[idx]);
+            curr -= expenses[idx].unit_amount.0 as usize;
+        } else {
+            break;
+        }
     }
 
-    let mut chosens_expenses = Vec::new();
-
-    for idx in chosen_indices.iter() {
-        chosens_expenses.push(&expenses[*idx]);
-    }
-
-    Ok(chosens_expenses)
+    Ok(chosen_expenses)
 }
 
 #[cfg(test)]
