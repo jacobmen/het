@@ -59,7 +59,7 @@ impl Repository for SqlRepository {
                 compressed_file_data BLOB NOT NULL,
                 is_deleted INTEGER NOT NULL DEFAULT 0 CHECK (is_deleted IN (0, 1)),
                 UNIQUE(name, file_data_type, expense_date, unit_amount)
-            );
+            ) STRICT;
             CREATE INDEX IF NOT EXISTS idx_expenses_is_deleted ON expenses(is_deleted);",
         )?;
 
