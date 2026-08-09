@@ -39,7 +39,7 @@ impl SqlRepository {
         rusqlite::vtab::array::load_module(&connection)
             .with_context(|| "failed to load rarray sqlite module")?;
 
-        Ok(SqlRepository { connection })
+        Ok(Self { connection })
     }
 }
 
@@ -180,13 +180,7 @@ mod tests {
 
         sql_repository.create_expense_table()?;
 
-        sql_repository.create_new_expense(
-            &"exp1".to_string(),
-            &"pdf".to_string(),
-            &"2025-01-01".to_string(),
-            2000,
-            &vec![0x1, 0x1],
-        )?;
+        sql_repository.create_new_expense("exp1", "pdf", "2025-01-01", 2000, &[0x1, 0x1])?;
 
         let expenses = sql_repository.get_all_expenses()?;
         assert_eq!(1, expenses.len());
@@ -210,27 +204,9 @@ mod tests {
 
         sql_repository.create_expense_table()?;
 
-        sql_repository.create_new_expense(
-            &"exp1".to_string(),
-            &"pdf".to_string(),
-            &"2025-01-01".to_string(),
-            2000,
-            &vec![0x1, 0x1],
-        )?;
-        sql_repository.create_new_expense(
-            &"exp2".to_string(),
-            &"png".to_string(),
-            &"2026-01-01".to_string(),
-            1000,
-            &vec![0xa, 0xb, 0xc],
-        )?;
-        sql_repository.create_new_expense(
-            &"exp3".to_string(),
-            &"jpeg".to_string(),
-            &"2026-06-01".to_string(),
-            1500,
-            &vec![0x1, 0x2, 0x3],
-        )?;
+        sql_repository.create_new_expense("exp1", "pdf", "2025-01-01", 2000, &[0x1, 0x1])?;
+        sql_repository.create_new_expense("exp2", "png", "2026-01-01", 1000, &[0xa, 0xb, 0xc])?;
+        sql_repository.create_new_expense("exp3", "jpeg", "2026-06-01", 1500, &[0x1, 0x2, 0x3])?;
 
         let expenses = sql_repository.get_all_expenses()?;
         assert_eq!(3, expenses.len());
@@ -269,23 +245,11 @@ mod tests {
 
         sql_repository.create_expense_table()?;
 
-        sql_repository.create_new_expense(
-            &"exp1".to_string(),
-            &"pdf".to_string(),
-            &"2025-01-01".to_string(),
-            2000,
-            &vec![0x1, 0x1],
-        )?;
+        sql_repository.create_new_expense("exp1", "pdf", "2025-01-01", 2000, &[0x1, 0x1])?;
 
         assert!(
             sql_repository
-                .create_new_expense(
-                    &"exp1".to_string(),
-                    &"pdf".to_string(),
-                    &"2025-01-01".to_string(),
-                    2000,
-                    &vec![0x1, 0x1],
-                )
+                .create_new_expense("exp1", "pdf", "2025-01-01", 2000, &[0x1, 0x1],)
                 .is_err()
         );
 

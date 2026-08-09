@@ -6,11 +6,12 @@ use crate::{
     sql::Repository,
 };
 use anyhow::{Context, Result, anyhow};
+use rusty_money::{Money, iso};
 
 pub fn retrieve_expenses<R: Repository>(
     expense_service: &ExpenseService<R>,
     dryrun: bool,
-    amount: f64,
+    amount: Money<'static, iso::Currency>,
     out_path: &Path,
 ) -> Result<()> {
     let expenses = expense_service.get_all_expenses()?;
@@ -22,19 +23,19 @@ pub fn retrieve_expenses<R: Repository>(
         ));
     }
 
-    let target_unit_amount = (amount * 100.0).round() as u64;
+    let target_unit_amount = u64::try_from(amount.to_minor_units())?;
     let closest_subset = closest_subset_to_target(&expenses, target_unit_amount)?;
 
     if closest_subset.is_empty() {
-        println!("no expenses reach ${}", amount);
+        println!("no expenses reach {amount}");
         return Ok(());
     }
 
     if dryrun {
-        println!("target unit amount: {}", target_unit_amount);
-        closest_subset
-            .iter()
-            .for_each(|e| println!("{}: {}", e.name.0, e.unit_amount.0));
+        println!("target unit amount: {target_unit_amount}");
+        for expense in &closest_subset {
+            println!("{}: {}", expense.name.0, expense.unit_amount.0);
+        }
 
         return Ok(());
     }
@@ -48,11 +49,11 @@ pub fn retrieve_expenses<R: Repository>(
 }
 
 fn write_expense_files(expenses: &[&Expense], out_path: &Path) -> Result<()> {
-    for expense in expenses.iter() {
+    for expense in expenses {
         let file_name = build_expense_file_name(expense);
         let file_write_path = out_path.join(&file_name);
         let file_contents = lzma::decompress(&expense.compressed_file_data.0)
-            .with_context(|| format!("failed to decompress data for {}", file_name))?;
+            .with_context(|| format!("failed to decompress data for {file_name}"))?;
 
         fs::write(&file_write_path, &file_contents).with_context(|| {
             format!(
@@ -68,7 +69,7 @@ fn write_expense_files(expenses: &[&Expense], out_path: &Path) -> Result<()> {
 fn build_expense_file_name(expense: &Expense) -> String {
     format!(
         "{}_{}_{}.{}",
-        expense.expense_date, expense.unit_amount.0, expense.name.0, expense.file_data_type.0
+        expense.date, expense.unit_amount.0, expense.name.0, expense.file_data_type.0
     )
 }
 
@@ -131,7 +132,12 @@ mod tests {
         let expense_service = ExpenseService::new(TestRepository {});
         let out_path = Path::new("./");
 
-        retrieve_expenses(&expense_service, false, 7.0, &out_path)?;
+        retrieve_expenses(
+            &expense_service,
+            false,
+            Money::from_minor(700, iso::USD),
+            out_path,
+        )?;
 
         let expenses = expense_service.get_all_expenses()?;
 
@@ -140,8 +146,8 @@ mod tests {
         let exp1 = &expenses[0];
         let exp2 = &expenses[1];
 
-        let exp1_path = out_path.join(build_expense_file_name(&exp1));
-        let exp2_path = out_path.join(build_expense_file_name(&exp2));
+        let exp1_path = out_path.join(build_expense_file_name(exp1));
+        let exp2_path = out_path.join(build_expense_file_name(exp2));
 
         assert!(fs::exists(&exp1_path)?, "exp1 file doesn't exist");
         assert!(fs::exists(&exp2_path)?, "exp2 file doesn't exist");
@@ -166,7 +172,7 @@ mod tests {
             id: ExpenseId(1),
             name: ExpenseName("exp1".to_string()),
             file_data_type: FileDataType("png".to_string()),
-            expense_date: NaiveDate::parse_from_str("2026-01-07", "%Y-%m-%d").unwrap(),
+            date: NaiveDate::parse_from_str("2026-01-07", "%Y-%m-%d").unwrap(),
             unit_amount: ExpenseUnitAmount(30000),
             compressed_file_data: ExpenseFileData(lzma::compress(&[0x1u8, 0x2u8], 9)?),
             is_deleted: false,
@@ -175,7 +181,7 @@ mod tests {
             id: ExpenseId(2),
             name: ExpenseName("exp2".to_string()),
             file_data_type: FileDataType("pdf".to_string()),
-            expense_date: NaiveDate::parse_from_str("2026-04-27", "%Y-%m-%d").unwrap(),
+            date: NaiveDate::parse_from_str("2026-04-27", "%Y-%m-%d").unwrap(),
             unit_amount: ExpenseUnitAmount(500),
             compressed_file_data: ExpenseFileData(lzma::compress(&[0x3u8, 0x4u8], 9)?),
             is_deleted: false,

@@ -1,6 +1,7 @@
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
+use rusty_money::{Money, Round, iso};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
@@ -26,15 +27,15 @@ pub enum Commands {
         file: PathBuf,
 
         /// Value of expense
-        #[arg(short, long, value_parser = amount_in_range)]
-        amount: f64,
+        #[arg(short, long, value_parser = parse_money)]
+        amount: Money<'static, iso::Currency>,
     },
 
     /// Retrieve health expenses summing as close as possible (and at minimum) to the provided value
     Retrieve {
         /// Target amount for expenses to reach
-        #[arg(value_parser = amount_in_range)]
-        amount: f64,
+        #[arg(value_parser = parse_money)]
+        amount: Money<'static, iso::Currency>,
 
         /// Output path of expense files
         #[arg(short, long, value_name = "OUT_PATH", default_value = ".")]
@@ -42,14 +43,20 @@ pub enum Commands {
     },
 }
 
-fn amount_in_range(s: &str) -> Result<f64, String> {
-    let amount: f64 = s.parse().map_err(|_| format!("`{s}` isn't a number"))?;
-
-    if amount > 0.0 {
-        Ok(amount)
-    } else {
-        Err(format!("`{amount}` is less than $0.00"))
+fn parse_money(s: &str) -> Result<Money<'static, iso::Currency>, String> {
+    let money = Money::from_str(s, iso::USD).map_err(|_| format!("`{s}` isn't a number"))?;
+    if !money.is_positive() {
+        return Err(format!("`{s}` is less than $0.00"));
     }
+
+    let money = money.round(2, Round::HalfUp);
+    // `to_minor_units` yields 0 when the value exceeds i64 range.
+    // Round trip to detect overflow
+    if Money::from_minor(money.to_minor_units(), iso::USD) != money {
+        return Err(format!("`{s}` is too large"));
+    }
+
+    Ok(money)
 }
 
 #[cfg(test)]
@@ -58,16 +65,31 @@ mod tests {
 
     #[test]
     fn test_valid_amount() {
-        assert!(amount_in_range("10").is_ok_and(|amount| amount == 10.0));
+        assert!(parse_money("10").is_ok_and(|amount| amount == Money::from_minor(1000, iso::USD)));
+        assert!(parse_money("5.25").is_ok_and(|amount| amount == Money::from_minor(525, iso::USD)));
+    }
+
+    #[test]
+    fn test_rounding_to_cent() {
+        let amount = parse_money("10.005").unwrap();
+        assert_eq!(Money::from_minor(1001, iso::USD), amount);
+        assert_eq!(1001, amount.to_minor_units());
+    }
+
+    #[test]
+    fn test_amount_too_large() {
+        assert!(parse_money("100000000000000000000").is_err());
+        assert!(parse_money("92233720368547758.08").is_err());
+        assert!(parse_money("92233720368547758.07").is_ok());
     }
 
     #[test]
     fn test_negative_amount() {
-        assert!(amount_in_range("-1").is_err());
+        assert!(parse_money("-1").is_err());
     }
 
     #[test]
     fn test_non_numeric_input() {
-        assert!(amount_in_range("abcd").is_err());
+        assert!(parse_money("abcd").is_err());
     }
 }

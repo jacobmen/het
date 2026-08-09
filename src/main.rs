@@ -1,3 +1,17 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::panic,
+        clippy::panic_in_result_fn,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::todo,
+        clippy::unreachable,
+        clippy::arithmetic_side_effects,
+    )
+)]
+
 use crate::{
     add_expense::add_expense, cli::Args, expense_service::ExpenseService,
     retrieve_expenses::retrieve_expenses, sql::SqlRepository,
@@ -28,11 +42,11 @@ fn main() -> Result<()> {
     match args.command {
         cli::Commands::Add { file, amount } => {
             add_expense(&expense_service, args.dryrun, &file, amount)
-                .with_context(|| format!("failed to create expense for `{}`", file.display()))?
+                .with_context(|| format!("failed to create expense for `{}`", file.display()))?;
         }
         cli::Commands::Retrieve { amount, out } => {
             retrieve_expenses(&expense_service, args.dryrun, amount, &out)
-                .with_context(|| "failed to retrieve expenses".to_string())?
+                .with_context(|| "failed to retrieve expenses".to_string())?;
         }
     }
 
