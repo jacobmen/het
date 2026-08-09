@@ -12,6 +12,8 @@ rust-lzma = "0.6.0"
 rusty-money = "0.5"
 
 [dev-dependencies]
+assert_cmd = "2.2.2"
+assert_fs = "1.1.4"
 proptest = "1.11.0"
 
 [lints.clippy]
