@@ -5,7 +5,7 @@ use crate::{
     expense_service::{Expense, ExpenseId, ExpenseService},
     sql::Repository,
 };
-use anyhow::{Context, Result, anyhow};
+use anyhow::{Context, Result};
 use rusty_money::{Money, iso};
 
 pub fn retrieve_expenses<R: Repository>(
@@ -15,13 +15,6 @@ pub fn retrieve_expenses<R: Repository>(
     out_path: &Path,
 ) -> Result<()> {
     let expenses = expense_service.get_all_expenses()?;
-
-    // TODO: turn into type safe parse-don't-validate pattern
-    if expenses.iter().any(|e| e.is_deleted) {
-        return Err(anyhow!(
-            "invariant broken, retrieved expenses contain deleted entry"
-        ));
-    }
 
     let target_unit_amount = u64::try_from(amount.to_minor_units())?;
     let closest_subset = closest_subset_to_target(&expenses, target_unit_amount)?;
@@ -75,98 +68,74 @@ fn build_expense_file_name(expense: &Expense) -> String {
 
 #[cfg(test)]
 mod tests {
+    use assert_fs::TempDir;
+    use assert_fs::prelude::*;
+    use chrono::NaiveDate;
+
     use crate::expense_service::{ExpenseFileData, ExpenseName, ExpenseUnitAmount, FileDataType};
     use crate::sql::ExpenseRow;
-    use chrono::NaiveDate;
+    use crate::test_util::InMemoryRepository;
 
     use super::*;
 
-    struct TestRepository;
-
-    impl Repository for TestRepository {
-        fn create_expense_table(&self) -> Result<()> {
-            Ok(())
-        }
-
-        fn get_all_expenses(&self) -> Result<Vec<ExpenseRow>> {
-            Ok(vec![
-                ExpenseRow {
-                    id: 1,
-                    name: "e2e1".to_string(),
-                    file_data_type: "jpg".to_string(),
-                    expense_date: "2026-04-27".to_string(),
-                    unit_amount: 300,
-                    compressed_file_data: lzma::compress(&[0x1u8, 0x2u8], 9)?,
-                    is_deleted: 0,
-                },
-                ExpenseRow {
-                    id: 2,
-                    name: "e2e2".to_string(),
-                    file_data_type: "pdf".to_string(),
-                    expense_date: "2025-03-01".to_string(),
-                    unit_amount: 500,
-                    compressed_file_data: lzma::compress(&[0x3u8, 0x4u8], 9)?,
-                    is_deleted: 0,
-                },
-            ])
-        }
-
-        fn create_new_expense(
-            &self,
-            _name: &str,
-            _file_data_type: &str,
-            _expense_date: &str,
-            _unit_amount: i64,
-            _compressed_file_data: &[u8],
-        ) -> Result<()> {
-            Ok(())
-        }
-
-        fn mark_expenses_as_deleted(&self, _expense_ids: &[i64]) -> Result<()> {
-            Ok(())
-        }
-    }
-
     #[test]
     fn test_retrieve_expenses_e2e() -> Result<()> {
-        let expense_service = ExpenseService::new(TestRepository {});
-        let out_path = Path::new("./");
+        let temp = TempDir::new()?;
+        let out = temp.child("out");
+        out.create_dir_all()?;
 
+        let expense_service = ExpenseService::new(InMemoryRepository::new(vec![
+            ExpenseRow {
+                id: 1,
+                name: "e2e1".to_string(),
+                file_data_type: "jpg".to_string(),
+                expense_date: "2026-04-27".to_string(),
+                unit_amount: 300,
+                compressed_file_data: lzma::compress(&[0x1u8, 0x2u8], 9)?,
+                is_deleted: false,
+            },
+            ExpenseRow {
+                id: 2,
+                name: "e2e2".to_string(),
+                file_data_type: "pdf".to_string(),
+                expense_date: "2025-03-01".to_string(),
+                unit_amount: 500,
+                compressed_file_data: lzma::compress(&[0x3u8, 0x4u8], 9)?,
+                is_deleted: false,
+            },
+        ]));
+
+        // Closest subset to $7.00 from $3.00 + $5.00 is both expenses ($8.00).
         retrieve_expenses(
             &expense_service,
             false,
             Money::from_minor(700, iso::USD),
-            out_path,
+            out.path(),
         )?;
 
-        let expenses = expense_service.get_all_expenses()?;
-
-        assert_eq!(2, expenses.len());
-
-        let exp1 = &expenses[0];
-        let exp2 = &expenses[1];
-
-        let exp1_path = out_path.join(build_expense_file_name(exp1));
-        let exp2_path = out_path.join(build_expense_file_name(exp2));
+        let exp1_path = out.join("2026-04-27_300_e2e1.jpg");
+        let exp2_path = out.join("2025-03-01_500_e2e2.pdf");
 
         assert!(fs::exists(&exp1_path)?, "exp1 file doesn't exist");
         assert!(fs::exists(&exp2_path)?, "exp2 file doesn't exist");
 
-        let exp1_file_content = fs::read(&exp1_path)?;
-        let exp2_file_content = fs::read(&exp2_path)?;
+        assert_eq!(vec![0x1, 0x2], fs::read(&exp1_path)?);
+        assert_eq!(vec![0x3, 0x4], fs::read(&exp2_path)?);
 
-        assert_eq!(vec![0x1, 0x2], exp1_file_content);
-        assert_eq!(vec![0x3, 0x4], exp2_file_content);
-
-        fs::remove_file(&exp1_path)?;
-        fs::remove_file(&exp2_path)?;
+        assert!(
+            expense_service.get_all_expenses()?.is_empty(),
+            "retrieved expenses must be marked deleted"
+        );
 
         Ok(())
     }
 
     #[test]
     fn test_write_expenses_e2e() -> Result<()> {
-        let out_path = Path::new("./");
+        let temp = TempDir::new()?;
+        let out = temp.child("out");
+        out.create_dir_all()?;
+        let out_path = out.path();
 
         let exp1 = Expense {
             id: ExpenseId(1),
@@ -201,9 +170,6 @@ mod tests {
 
         assert_eq!(vec![0x1, 0x2], exp1_file_content);
         assert_eq!(vec![0x3, 0x4], exp2_file_content);
-
-        fs::remove_file(&exp1_path)?;
-        fs::remove_file(&exp2_path)?;
 
         Ok(())
     }

@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::Result;
 use chrono::NaiveDate;
 
 use crate::sql::Repository;
@@ -55,11 +55,7 @@ impl<R: Repository> ExpenseService<R> {
                     date: NaiveDate::parse_from_str(&r.expense_date, "%Y-%m-%d")?,
                     unit_amount: ExpenseUnitAmount(r.unit_amount),
                     compressed_file_data: ExpenseFileData(r.compressed_file_data),
-                    is_deleted: match r.is_deleted {
-                        0 => Ok(false),
-                        1 => Ok(true),
-                        _ => Err(anyhow!("unknown is_deleted column: {}", r.is_deleted)),
-                    }?,
+                    is_deleted: r.is_deleted,
                 })
             })
             .collect::<Result<_>>()
@@ -91,53 +87,21 @@ impl<R: Repository> ExpenseService<R> {
 #[cfg(test)]
 mod tests {
     use crate::sql::ExpenseRow;
+    use crate::test_util::InMemoryRepository;
 
     use super::*;
 
-    struct TestRepository;
-
-    impl Repository for TestRepository {
-        fn create_expense_table(&self) -> Result<()> {
-            Ok(())
-        }
-
-        fn get_all_expenses(&self) -> Result<Vec<ExpenseRow>> {
-            Ok(vec![ExpenseRow {
-                id: 1,
-                name: "expense".to_string(),
-                file_data_type: "pdf".to_string(),
-                expense_date: "2026-01-07".to_string(),
-                unit_amount: 2000,
-                compressed_file_data: vec![0x1],
-                is_deleted: 0,
-            }])
-        }
-
-        fn create_new_expense(
-            &self,
-            name: &str,
-            file_data_type: &str,
-            expense_date: &str,
-            unit_amount: i64,
-            compressed_file_data: &[u8],
-        ) -> Result<()> {
-            assert_eq!("expense", name);
-            assert_eq!("pdf", file_data_type);
-            assert_eq!("2026-01-07", expense_date);
-            assert_eq!(2000, unit_amount);
-            assert_eq!(vec![0x1], compressed_file_data);
-
-            Ok(())
-        }
-
-        fn mark_expenses_as_deleted(&self, _expense_ids: &[i64]) -> Result<()> {
-            Ok(())
-        }
-    }
-
     #[test]
     fn test_get_all_expenses() -> Result<()> {
-        let expense_service = ExpenseService::new(TestRepository {});
+        let expense_service = ExpenseService::new(InMemoryRepository::new(vec![ExpenseRow {
+            id: 1,
+            name: "expense".to_string(),
+            file_data_type: "pdf".to_string(),
+            expense_date: "2026-01-07".to_string(),
+            unit_amount: 2000,
+            compressed_file_data: vec![0x1],
+            is_deleted: false,
+        }]));
 
         let expenses = expense_service.get_all_expenses()?;
         assert_eq!(1, expenses.len());
@@ -157,7 +121,7 @@ mod tests {
 
     #[test]
     fn test_create_new_expense() -> Result<()> {
-        let expense_service = ExpenseService::new(TestRepository {});
+        let expense_service = ExpenseService::new(InMemoryRepository::new(vec![]));
 
         expense_service.create_new_expense(
             &ExpenseName("expense".to_string()),
@@ -166,6 +130,18 @@ mod tests {
             ExpenseUnitAmount(2000),
             &ExpenseFileData(vec![0x1]),
         )?;
+
+        let expenses = expense_service.get_all_expenses()?;
+        assert_eq!(1, expenses.len());
+
+        let expense = &expenses[0];
+
+        assert_eq!(ExpenseName("expense".to_string()), expense.name);
+        assert_eq!(FileDataType("pdf".to_string()), expense.file_data_type);
+        assert_eq!(NaiveDate::from_ymd_opt(2026, 1, 7).unwrap(), expense.date);
+        assert_eq!(ExpenseUnitAmount(2000), expense.unit_amount);
+        assert_eq!(ExpenseFileData(vec![0x1]), expense.compressed_file_data);
+        assert!(!expense.is_deleted);
 
         Ok(())
     }

@@ -13,12 +13,17 @@
 )]
 
 use crate::{
-    add_expense::add_expense, cli::Args, expense_service::ExpenseService,
-    retrieve_expenses::retrieve_expenses, sql::SqlRepository,
+    add_expense::{AddExpenseSummary, add_expense},
+    cli::Args,
+    expense_service::ExpenseService,
+    retrieve_expenses::retrieve_expenses,
+    sql::SqlRepository,
 };
 use anyhow::{Context, Result};
+use chrono::Local;
 use clap::Parser;
 use rusqlite::Connection;
+use std::fs;
 
 mod add_expense;
 mod algo;
@@ -26,6 +31,9 @@ mod cli;
 mod expense_service;
 mod retrieve_expenses;
 mod sql;
+
+#[cfg(test)]
+mod test_util;
 
 fn main() -> Result<()> {
     let args = Args::parse();
@@ -38,11 +46,48 @@ fn main() -> Result<()> {
 
     expense_service.create_expense_table()?;
 
-    // TODO: replace dryrun flag with dryrun repository for abstraction
     match args.command {
         cli::Commands::Add { file, amount } => {
-            add_expense(&expense_service, args.dryrun, &file, amount)
-                .with_context(|| format!("failed to create expense for `{}`", file.display()))?;
+            let expense_date = Local::now().naive_local().date();
+            let file_contents = fs::read(&file)
+                .with_context(|| format!("failed to read expense file `{}`", file.display()))?;
+
+            let summary = add_expense(
+                &expense_service,
+                args.dryrun,
+                &file,
+                &file_contents,
+                expense_date,
+                amount,
+            )
+            .with_context(|| format!("failed to create expense for `{}`", file.display()))?;
+
+            match summary {
+                AddExpenseSummary::DryRun {
+                    name,
+                    file_data_type,
+                    unit_amount,
+                } => {
+                    println!("Dryrun add");
+                    println!("\texpense=`{}`", name.0);
+                    println!("\tfile_data_type=`{}`", file_data_type.0);
+                    println!("\tunit_amount=`{}`", unit_amount.0);
+                }
+                AddExpenseSummary::Created {
+                    name,
+                    file_data_type,
+                    expense_date,
+                    unit_amount,
+                    compressed_data_size,
+                } => {
+                    println!("Created expense");
+                    println!("\texpense=`{}`", name.0);
+                    println!("\tfile_data_type=`{}`", file_data_type.0);
+                    println!("\texpense_date=`{}`", expense_date.format("%Y-%m-%d"));
+                    println!("\tunit_amount=`{}`", unit_amount.0);
+                    println!("\tcompressed_data_size=`{compressed_data_size}`");
+                }
+            }
         }
         cli::Commands::Retrieve { amount, out } => {
             retrieve_expenses(&expense_service, args.dryrun, amount, &out)

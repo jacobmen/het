@@ -81,25 +81,9 @@ pub fn closest_subset_to_target(expenses: &[Expense], target: u64) -> Result<Vec
 
 #[cfg(test)]
 mod tests {
-    use chrono::NaiveDate;
-
-    use crate::expense_service::{
-        ExpenseFileData, ExpenseId, ExpenseName, ExpenseUnitAmount, FileDataType,
-    };
+    use crate::test_util::make_expense;
 
     use super::*;
-
-    fn make_expense(id: i64, amount: i64) -> Expense {
-        Expense {
-            id: ExpenseId(id),
-            name: ExpenseName("test_expense".to_string()),
-            file_data_type: FileDataType("pdf".to_string()),
-            date: NaiveDate::parse_from_str("2026-01-07", "%Y-%m-%d").unwrap(),
-            unit_amount: ExpenseUnitAmount(amount),
-            compressed_file_data: ExpenseFileData(vec![1, 2, 3]),
-            is_deleted: false,
-        }
-    }
 
     #[test]
     fn test_no_viable_subset() {

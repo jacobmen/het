@@ -3,6 +3,7 @@ use std::rc::Rc;
 use anyhow::{Context, Result, anyhow};
 use rusqlite::{Connection, types::Value};
 
+#[derive(Clone, Debug)]
 pub struct ExpenseRow {
     pub id: i64,
     pub name: String,
@@ -10,7 +11,7 @@ pub struct ExpenseRow {
     pub expense_date: String,
     pub unit_amount: i64,
     pub compressed_file_data: Vec<u8>,
-    pub is_deleted: u8,
+    pub is_deleted: bool,
 }
 
 pub struct SqlRepository {
@@ -192,7 +193,7 @@ mod tests {
         assert_eq!("2025-01-01", expense.expense_date);
         assert_eq!(2000, expense.unit_amount);
         assert_eq!(vec![0x1, 0x1], expense.compressed_file_data);
-        assert_eq!(0, expense.is_deleted);
+        assert!(!expense.is_deleted);
 
         Ok(())
     }
@@ -233,7 +234,7 @@ mod tests {
         assert_eq!("2026-06-01", expense.expense_date);
         assert_eq!(1500, expense.unit_amount);
         assert_eq!(vec![0x1, 0x2, 0x3], expense.compressed_file_data);
-        assert_eq!(0, expense.is_deleted);
+        assert!(!expense.is_deleted);
 
         Ok(())
     }

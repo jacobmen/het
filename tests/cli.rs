@@ -1,3 +1,17 @@
+#![cfg_attr(
+    test,
+    allow(
+        clippy::panic,
+        clippy::panic_in_result_fn,
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::indexing_slicing,
+        clippy::todo,
+        clippy::unreachable,
+        clippy::arithmetic_side_effects,
+    )
+)]
+
 use std::{fs, path::Path};
 
 use anyhow::Result;
@@ -42,7 +56,38 @@ fn retrieve_expenses(db: &Path, out: &Path, amount: &str) -> Result<()> {
 }
 
 #[test]
-#[allow(clippy::panic_in_result_fn)]
+fn dryrun_add_prints_and_persists_nothing() -> Result<()> {
+    let temp = TempDir::new()?;
+    let db = temp.child("het.db");
+    let expense = temp.child("dryrun.pdf");
+    expense.write_binary(b"ignored")?;
+
+    Command::cargo_bin("het")?
+        .arg("--db")
+        .arg(db.path())
+        .arg("--dryrun")
+        .arg("add")
+        .arg("--file")
+        .arg(expense.path())
+        .arg("--amount")
+        .arg("10")
+        .assert()
+        .success()
+        .stdout("Dryrun add\n\texpense=`dryrun`\n\tfile_data_type=`pdf`\n\tunit_amount=`1000`\n");
+    Command::cargo_bin("het")?
+        .arg("--db")
+        .arg(db.path())
+        .arg("retrieve")
+        .arg("--out")
+        .arg(temp.path())
+        .arg("10")
+        .assert()
+        .success()
+        .stdout("no expenses reach $10.00\n");
+    Ok(())
+}
+
+#[test]
 fn add_and_retrieve_expenses_end_to_end() -> Result<()> {
     let temp = TempDir::new()?;
     let db = temp.child("het.db");
