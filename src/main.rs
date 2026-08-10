@@ -16,7 +16,7 @@ use crate::{
     add_expense::{AddExpenseSummary, add_expense},
     cli::Args,
     expense_service::ExpenseService,
-    retrieve_expenses::retrieve_expenses,
+    retrieve_expenses::{RetrieveExpensesSummary, retrieve_expenses},
     sql::SqlRepository,
 };
 use anyhow::{Context, Result};
@@ -90,8 +90,35 @@ fn main() -> Result<()> {
             }
         }
         cli::Commands::Retrieve { amount, out } => {
-            retrieve_expenses(&expense_service, args.dryrun, amount, &out)
+            let summary = retrieve_expenses(&expense_service, args.dryrun, amount)
                 .with_context(|| "failed to retrieve expenses".to_string())?;
+
+            match summary {
+                RetrieveExpensesSummary::NoMatch => println!("no expenses reach {amount}"),
+                RetrieveExpensesSummary::DryRun {
+                    target_unit_amount,
+                    expenses,
+                } => {
+                    println!("target unit amount: {target_unit_amount}");
+                    for (name, unit_amount) in expenses {
+                        println!("{}: {}", name.0, unit_amount.0);
+                    }
+                }
+                RetrieveExpensesSummary::Retrieved { files } => {
+                    for file in &files {
+                        let file_write_path = out.join(&file.name);
+                        fs::write(&file_write_path, &file.contents).with_context(|| {
+                            format!(
+                                "failed to write expense file to {}",
+                                file_write_path.display()
+                            )
+                        })?;
+                    }
+
+                    let expense_ids = files.iter().map(|file| file.id).collect::<Vec<_>>();
+                    expense_service.mark_expenses_as_deleted(&expense_ids)?;
+                }
+            }
         }
     }
 

@@ -135,3 +135,35 @@ fn add_and_retrieve_expenses_end_to_end() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn retrieve_dryrun_prints_and_persists_nothing() -> Result<()> {
+    let temp = TempDir::new()?;
+    let db = temp.child("het.db");
+    let expense = temp.child("expense_a.pdf");
+    expense.write_binary(EXPENSE_A_BYTES)?;
+
+    add_expense(db.path(), expense.path(), "100")?;
+
+    Command::cargo_bin("het")?
+        .arg("--db")
+        .arg(db.path())
+        .arg("--dryrun")
+        .arg("retrieve")
+        .arg("--out")
+        .arg(temp.path())
+        .arg("100")
+        .assert()
+        .success()
+        .stdout("target unit amount: 10000\nexpense_a: 10000\n");
+
+    let out_dir = temp.child("out");
+    out_dir.create_dir_all()?;
+    retrieve_expenses(db.path(), out_dir.path(), "100")?;
+
+    let expense_date = Local::now().naive_local().date();
+    let extracted = out_dir.join(format!("{expense_date}_10000_expense_a.pdf"));
+    assert_eq!(EXPENSE_A_BYTES.to_vec(), fs::read(&extracted)?);
+
+    Ok(())
+}
