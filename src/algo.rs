@@ -84,6 +84,8 @@ mod tests {
     use crate::test_util::make_expense;
 
     use super::*;
+    use proptest::prelude::*;
+    use std::collections::HashSet;
 
     #[test]
     fn test_no_viable_subset() {
@@ -189,8 +191,14 @@ mod tests {
         let exp1 = make_expense(1, 10);
         let expenses = vec![exp1];
 
+        // u64::MAX: fails the `usize` conversion on 32-bit hosts, and
+        // `checked_add` overflows on 64-bit hosts.
         let res = closest_subset_to_target(&expenses, u64::MAX);
+        assert!(res.is_err());
 
+        // usize::MAX passes the `usize` conversion on both host widths, so the
+        // error comes from `target + max_value` overflowing `checked_add`.
+        let res = closest_subset_to_target(&expenses, u64::try_from(usize::MAX).unwrap());
         assert!(res.is_err());
     }
 
@@ -240,5 +248,142 @@ mod tests {
         let subset = reachable.unwrap();
         assert_eq!(1, subset.len());
         assert!(subset.contains(&&make_expense(1, 6)));
+    }
+
+    /// Minimum subset sum `>= target` over all subsets (None if none exists).
+    fn bruteforce_min_over(amounts: &[i64], target: u64) -> Option<u64> {
+        let mut sums = vec![0_u64];
+
+        for &a in amounts {
+            let a = u64::try_from(a).unwrap();
+            let additions: Vec<u64> = sums.iter().map(|&s| s.saturating_add(a)).collect();
+            sums.extend(additions);
+        }
+
+        sums.into_iter().filter(|&s| s >= target).min()
+    }
+
+    proptest! {
+        #[test]
+        fn prop_oracle_matches_bruteforce(
+            amounts in prop::collection::vec(0_i64..=50, 0..=8),
+            target in 0_u64..=1_000,
+        ) {
+            let expenses: Vec<Expense> = amounts
+                .iter()
+                .enumerate()
+                .map(|(i, &a)| make_expense(i64::try_from(i).unwrap(), a))
+                .collect();
+
+            let res = closest_subset_to_target(&expenses, target);
+            prop_assert!(res.is_ok(), "amounts={amounts:?} target={target}");
+            let subset = res.unwrap();
+
+            let actual: u64 = subset
+                .iter()
+                .map(|e| u64::try_from(e.unit_amount.0).unwrap())
+                .sum();
+            if let Some(expected) = bruteforce_min_over(&amounts, target) {
+                prop_assert_eq!(actual, expected, "amounts={:?} target={}", amounts, target);
+            } else {
+                prop_assert!(
+                    subset.is_empty(),
+                    "expected empty result: amounts={:?} target={}",
+                    amounts,
+                    target,
+                );
+            }
+
+            let ids: Vec<i64> = subset.iter().map(|e| e.id.0).collect();
+            prop_assert_eq!(
+                ids.len(),
+                ids.iter().collect::<HashSet<_>>().len(),
+                "duplicate expense chosen: amounts={:?} target={}",
+                amounts,
+                target,
+            );
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn prop_structural_invariants(
+            amounts in prop::collection::vec(0_i64..=10_000, 0..=20),
+            target in 0_u64..=50_000,
+        ) {
+            let expenses: Vec<Expense> = amounts
+                .iter()
+                .enumerate()
+                .map(|(i, &a)| make_expense(i64::try_from(i).unwrap(), a))
+                .collect();
+
+            let whole: u64 = amounts.iter().map(|&a| u64::try_from(a).unwrap()).sum();
+            let res = closest_subset_to_target(&expenses, target);
+            prop_assert!(res.is_ok(), "amounts={amounts:?} target={target}");
+            let subset = res.unwrap();
+
+            if target == 0 {
+                prop_assert!(subset.is_empty(), "amounts={amounts:?} target={target}");
+            } else if whole < target {
+                prop_assert!(subset.is_empty(), "amounts={amounts:?} target={target}");
+            } else {
+                prop_assert!(!subset.is_empty(), "amounts={amounts:?} target={target}");
+                let sum: u64 = subset
+                    .iter()
+                    .map(|e| u64::try_from(e.unit_amount.0).unwrap())
+                    .sum();
+                prop_assert!(sum >= target, "amounts={amounts:?} target={target}");
+
+                let max_amt = amounts.iter().copied().max().unwrap();
+                if max_amt > 0 {
+                    prop_assert!(
+                        sum < target.checked_add(u64::try_from(max_amt).unwrap()).unwrap(),
+                        "amounts={amounts:?} target={target}",
+                    );
+                }
+
+                let min_chosen = subset.iter().map(|e| e.unit_amount.0).min().unwrap();
+                let min_chosen = u64::try_from(min_chosen).unwrap();
+                let removed_sum = sum - min_chosen;
+                prop_assert!(
+                    removed_sum < target,
+                    "subset minus its smallest element still meets target (not minimal): \
+                     amounts={amounts:?} target={target}",
+                );
+
+                let ids: Vec<i64> = subset.iter().map(|e| e.id.0).collect();
+                prop_assert_eq!(
+                    ids.len(),
+                    ids.iter().collect::<HashSet<_>>().len(),
+                    "duplicate expense chosen: amounts={:?} target={}",
+                    amounts,
+                    target,
+                );
+            }
+        }
+    }
+
+    proptest! {
+        #[test]
+        fn prop_negative_amounts_error(
+            amounts in prop::collection::vec(-50_i64..=50, 0..=20),
+            target in 0_u64..=1_000,
+        ) {
+            let expenses: Vec<Expense> = amounts
+                .iter()
+                .enumerate()
+                .map(|(i, &a)| make_expense(i64::try_from(i).unwrap(), a))
+                .collect();
+
+            let res = closest_subset_to_target(&expenses, target);
+            if amounts.is_empty() {
+                prop_assert!(res.is_ok(), "amounts={amounts:?} target={target}");
+                prop_assert!(res.unwrap().is_empty(), "amounts={amounts:?} target={target}");
+            } else if amounts.iter().any(|&a| a < 0) {
+                prop_assert!(res.is_err(), "expected error: amounts={amounts:?} target={target}");
+            } else {
+                prop_assert!(res.is_ok(), "expected ok: amounts={amounts:?} target={target}");
+            }
+        }
     }
 }
