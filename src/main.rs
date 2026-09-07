@@ -31,6 +31,7 @@ mod cli;
 mod expense_service;
 mod retrieve_expenses;
 mod sql;
+mod xdg_dirs;
 
 #[cfg(test)]
 mod test_util;
