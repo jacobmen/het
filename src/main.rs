@@ -14,19 +14,22 @@
 
 use crate::{
     add_expense::{AddExpenseSummary, add_expense},
+    app_config::get_app_config,
     cli::Args,
     expense_service::ExpenseService,
     retrieve_expenses::{RetrieveExpensesSummary, retrieve_expenses},
     sql::SqlRepository,
+    xdg_dirs::{XdgVar, config_home_dir, data_home_dir},
 };
 use anyhow::{Context, Result};
 use chrono::Local;
 use clap::Parser;
 use rusqlite::Connection;
-use std::fs;
+use std::{fs, path::PathBuf, process::exit};
 
 mod add_expense;
 mod algo;
+mod app_config;
 mod cli;
 mod expense_service;
 mod retrieve_expenses;
@@ -39,13 +42,12 @@ mod test_util;
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let connection = Connection::open(&args.db)
-        .with_context(|| format!("failed to open {}", args.db.display()))?;
+    let Ok(home_env_var) = std::env::var("HOME") else {
+        println!("$HOME is unset; required environment variable");
+        exit(1);
+    };
 
-    let sql_repository = SqlRepository::try_new(connection)?;
-    let expense_service = ExpenseService::new(sql_repository);
-
-    expense_service.create_expense_table()?;
+    let expense_service = open_expense_service(&home_env_var, args.db)?;
 
     match args.command {
         cli::Commands::Add { file, amount } => {
@@ -124,4 +126,48 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn open_expense_service(
+    home_env_var: &str,
+    db_override: Option<PathBuf>,
+) -> Result<ExpenseService<SqlRepository>> {
+    let xdg_config_home =
+        std::env::var("XDG_CONFIG_HOME").map_or(XdgVar::Missing, |value| XdgVar::Present { value });
+
+    let config_file_path = config_home_dir(&xdg_config_home, home_env_var).join("config.toml");
+    let config_file_content = if config_file_path.try_exists().with_context(|| {
+        format!(
+            "failed to check for existence of {}",
+            config_file_path.display()
+        )
+    })? {
+        Some(fs::read_to_string(&config_file_path)?)
+    } else {
+        None
+    };
+
+    let app_config = match config_file_content {
+        Some(content) => Some(get_app_config(&content)?),
+        None => None,
+    };
+
+    let xdg_data_home =
+        std::env::var("XDG_DATA_HOME").map_or(XdgVar::Missing, |value| XdgVar::Present { value });
+
+    let db_path = match (db_override, app_config) {
+        (Some(db_path), _) => db_path,
+        (None, Some(app_config)) => app_config.db_path,
+        (None, None) => data_home_dir(&xdg_data_home, home_env_var).join("het.db"),
+    };
+
+    let connection = Connection::open(&db_path)
+        .with_context(|| format!("failed to open {}", db_path.display()))?;
+
+    let sql_repository = SqlRepository::try_new(connection)?;
+    let expense_service = ExpenseService::new(sql_repository);
+
+    expense_service.create_expense_table()?;
+
+    Ok(expense_service)
 }

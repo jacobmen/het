@@ -7,8 +7,8 @@ use rusty_money::{Money, Round, iso};
 #[command(version, about, long_about = None)]
 pub struct Args {
     /// Override default DB path
-    #[arg(long, value_name = "DB", default_value = "het.db")]
-    pub db: PathBuf,
+    #[arg(long, value_name = "DB", default_value = None)]
+    pub db: Option<PathBuf>,
 
     /// Dry-run operation without any state changes
     #[arg(short, long)]

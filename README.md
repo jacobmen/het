@@ -32,6 +32,20 @@ To avoid outdated documentation, this README only includes high level details on
 - `het add`: add a new expense
 - `het retrieve`: provide a target amount and `het` will retrieve and write the best combination of expenses to the target directory
 
+## Config File
+
+`het`'s' configuration can be modified in `config.toml`.
+The application searches for the file in this order;
+
+1. `$XDG_CONFIG_HOME/het/config.toml` — if `XDG_CONFIG_HOME` set and non-empty.
+2. `$HOME/.config/het/config.toml` — otherwise.
+
+### Settings
+
+| Setting | Purpose | Options |
+| --- | --- | --- |
+| `db_path` | Location of the DB file where expenses are stored. | Any filesystem path. If no config file is found, defaults to `$XDG_DATA_HOME/het/het.db`, falling back to `$HOME/.local/share/het/het.db` when `XDG_DATA_HOME` is unset or empty. The `--db` flag takes precedence over this setting. |
+
 ## AI
 
 Parts of this codebase are written with AI.
