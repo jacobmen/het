@@ -53,31 +53,33 @@ pub fn add_expense<R: Repository>(
         return Err(anyhow!("file data type is empty"));
     }
 
-    let unit_amount = input_amount.to_minor_units();
+    let file_data_type = FileDataType(file_data_type.to_lowercase());
+    let expense_name = ExpenseName(expense_name.to_string());
+    let unit_amount = ExpenseUnitAmount(input_amount.to_minor_units());
 
     if dryrun {
         return Ok(AddExpenseSummary::DryRun {
-            name: ExpenseName(expense_name.to_string()),
-            file_data_type: FileDataType(file_data_type.to_string()),
-            unit_amount: ExpenseUnitAmount(unit_amount),
+            name: expense_name,
+            file_data_type,
+            unit_amount,
         });
     }
 
     let compressed_file_data = ExpenseFileData(lzma::compress(file_contents, 9)?);
 
     expense_service.create_new_expense(
-        &ExpenseName(expense_name.to_string()),
-        &FileDataType(file_data_type.to_string()),
+        &expense_name,
+        &file_data_type,
         expense_date,
-        ExpenseUnitAmount(unit_amount),
+        unit_amount,
         &compressed_file_data,
     )?;
 
     Ok(AddExpenseSummary::Created {
-        name: ExpenseName(expense_name.to_string()),
-        file_data_type: FileDataType(file_data_type.to_string()),
+        name: expense_name,
+        file_data_type,
         expense_date,
-        unit_amount: ExpenseUnitAmount(unit_amount),
+        unit_amount,
         compressed_data_size: compressed_file_data.0.len(),
     })
 }
@@ -132,6 +134,32 @@ mod tests {
             ExpenseFileData(lzma::compress(CONTENTS, 9)?),
             expense.compressed_file_data
         );
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_uppercase_file_data_type() -> Result<()> {
+        let expense_service = ExpenseService::new(InMemoryRepository::new(vec![]));
+
+        let summary = add_expense(
+            &expense_service,
+            false,
+            Path::new("receipt.PDF"),
+            CONTENTS,
+            FIXED_DATE,
+            Money::from_minor(10_000, iso::USD),
+        )?;
+        match summary {
+            AddExpenseSummary::Created { file_data_type, .. } => {
+                assert_eq!(FileDataType("pdf".into()), file_data_type);
+            }
+            AddExpenseSummary::DryRun { .. } => unreachable!("expected a real add"),
+        }
+
+        let expenses = expense_service.get_all_expenses()?;
+        assert_eq!(1, expenses.len());
+        assert_eq!(FileDataType("pdf".into()), expenses[0].file_data_type);
 
         Ok(())
     }
