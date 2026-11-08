@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 pub enum XdgVar {
     Missing,
@@ -21,6 +21,14 @@ pub fn config_home_dir(var: &XdgVar, home: &str) -> PathBuf {
         XdgVar::Present { value } => value.clone(),
     };
     PathBuf::from(base).join("het")
+}
+
+pub fn expand_tilde(path: &Path, home: &str) -> PathBuf {
+    match path.strip_prefix("~") {
+        Ok(rest) if rest.as_os_str().is_empty() => PathBuf::from(home),
+        Ok(rest) => PathBuf::from(home).join(rest),
+        Err(_) => path.to_path_buf(),
+    }
 }
 
 #[cfg(test)]
@@ -92,6 +100,54 @@ mod tests {
                 },
                 "/home/user"
             )
+        );
+    }
+
+    #[test]
+    fn test_expand_tilde_home_only() {
+        assert_eq!(
+            PathBuf::from("/home/user"),
+            expand_tilde(Path::new("~"), "/home/user")
+        );
+    }
+
+    #[test]
+    fn test_expand_tilde_home_with_subpath() {
+        assert_eq!(
+            PathBuf::from("/home/user/data/het.db"),
+            expand_tilde(Path::new("~/data/het.db"), "/home/user")
+        );
+    }
+
+    #[test]
+    fn test_expand_tilde_trailing_slash() {
+        assert_eq!(
+            PathBuf::from("/home/user"),
+            expand_tilde(Path::new("~/"), "/home/user")
+        );
+    }
+
+    #[test]
+    fn test_expand_tilde_other_user_unchanged() {
+        assert_eq!(
+            PathBuf::from("~other/db"),
+            expand_tilde(Path::new("~other/db"), "/home/user")
+        );
+    }
+
+    #[test]
+    fn test_expand_tilde_absolute_path_unchanged() {
+        assert_eq!(
+            PathBuf::from("/abs/het.db"),
+            expand_tilde(Path::new("/abs/het.db"), "/home/user")
+        );
+    }
+
+    #[test]
+    fn test_expand_tilde_relative_path_unchanged() {
+        assert_eq!(
+            PathBuf::from("rel/het.db"),
+            expand_tilde(Path::new("rel/het.db"), "/home/user")
         );
     }
 }

@@ -174,3 +174,47 @@ fn retrieve_dryrun_prints_and_persists_nothing() -> Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn add_uses_tilde_db_path_from_config() -> Result<()> {
+    let temp = TempDir::new()?;
+    let db = temp.child("data/het.db");
+    temp.child("data").create_dir_all()?;
+    temp.child(".config/het/config.toml")
+        .write_str("db_path = \"~/data/het.db\"\n")?;
+
+    let expense = temp.child(EXPENSE_A);
+    expense.write_binary(EXPENSE_A_BYTES)?;
+
+    het()?
+        .env("HOME", temp.path())
+        .arg("add")
+        .arg("--file")
+        .arg(expense.path())
+        .arg("--amount")
+        .arg("10")
+        .assert()
+        .success();
+
+    // Cross-check: the expense landed in the tilde-expanded DB, not elsewhere.
+    let out_dir = temp.child("retrieved");
+    out_dir.create_dir_all()?;
+    het()?
+        .env("HOME", temp.path())
+        .arg("--db")
+        .arg(db.path())
+        .arg("retrieve")
+        .arg("--out")
+        .arg(out_dir.path())
+        .arg("10")
+        .assert()
+        .success();
+    assert_eq!(
+        EXPENSE_A_BYTES.to_vec(),
+        fs::read(out_dir.join(format!(
+            "{}_1000_expense_a.pdf",
+            Local::now().naive_local().date()
+        )))?
+    );
+    Ok(())
+}

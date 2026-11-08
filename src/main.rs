@@ -19,7 +19,7 @@ use crate::{
     expense_service::ExpenseService,
     retrieve_expenses::{RetrieveExpensesSummary, retrieve_expenses},
     sql::SqlRepository,
-    xdg_dirs::{XdgVar, config_home_dir, data_home_dir},
+    xdg_dirs::{XdgVar, config_home_dir, data_home_dir, expand_tilde},
 };
 use anyhow::{Context, Result};
 use chrono::Local;
@@ -160,6 +160,8 @@ fn open_expense_service(
         (None, Some(app_config)) => app_config.db_path,
         (None, None) => data_home_dir(&xdg_data_home, home_env_var).join("het.db"),
     };
+
+    let db_path = expand_tilde(&db_path, home_env_var);
 
     let connection = Connection::open(&db_path)
         .with_context(|| format!("failed to open {}", db_path.display()))?;
