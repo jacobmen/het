@@ -35,10 +35,29 @@ pub trait Repository {
     fn mark_expenses_as_deleted(&self, expense_ids: &[i64]) -> Result<()>;
 }
 
+fn configure_connection(connection: &Connection) -> Result<()> {
+    connection
+        .pragma_update(None, "synchronous", "EXTRA")
+        .with_context(|| "failed to set `synchronous` pragma")?;
+    connection
+        .pragma_update(None, "cell_size_check", "ON")
+        .with_context(|| "failed to set `cell_size_check` pragma")?;
+
+    let check_result: String = connection
+        .query_row("PRAGMA quick_check", [], |row| row.get(0))
+        .with_context(|| "failed to run `quick_check`")?;
+    if check_result != "ok" {
+        return Err(anyhow!("database failed `quick_check`: {check_result}"));
+    }
+
+    Ok(())
+}
+
 impl SqlRepository {
     pub fn try_new(connection: Connection) -> Result<Self> {
         rusqlite::vtab::array::load_module(&connection)
             .with_context(|| "failed to load rarray sqlite module")?;
+        configure_connection(&connection)?;
 
         Ok(Self { connection })
     }
@@ -46,10 +65,6 @@ impl SqlRepository {
 
 impl Repository for SqlRepository {
     fn create_expense_table(&self) -> Result<()> {
-        if self.connection.table_exists(None, "expenses")? {
-            return Ok(());
-        }
-
         self.connection.execute_batch(
             "CREATE TABLE IF NOT EXISTS expenses (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

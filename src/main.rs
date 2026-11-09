@@ -24,7 +24,7 @@ use crate::{
 use anyhow::{Context, Result};
 use chrono::Local;
 use clap::Parser;
-use rusqlite::Connection;
+use rusqlite::{Connection, OpenFlags};
 use std::{fs, path::PathBuf, process::exit};
 
 mod add_expense;
@@ -163,8 +163,11 @@ fn open_expense_service(
 
     let db_path = expand_tilde(&db_path, home_env_var);
 
-    let connection = Connection::open(&db_path)
-        .with_context(|| format!("failed to open {}", db_path.display()))?;
+    let connection = Connection::open_with_flags(
+        &db_path,
+        OpenFlags::default() | OpenFlags::SQLITE_OPEN_EXRESCODE,
+    )
+    .with_context(|| format!("failed to open {}", db_path.display()))?;
 
     let sql_repository = SqlRepository::try_new(connection)?;
     let expense_service = ExpenseService::new(sql_repository);
