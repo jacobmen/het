@@ -99,7 +99,7 @@ mod tests {
         assert!(res.is_ok());
 
         let subset = res.unwrap();
-        assert!(subset.is_empty());
+        assert_eq!(subset, Vec::<&Expense>::new());
     }
 
     #[test]
@@ -230,7 +230,7 @@ mod tests {
         let res = closest_subset_to_target(&expenses, 0);
 
         assert!(res.is_ok());
-        assert!(res.unwrap().is_empty());
+        assert_eq!(res.unwrap(), Vec::<&Expense>::new());
     }
 
     #[test]
@@ -240,7 +240,7 @@ mod tests {
 
         let below = closest_subset_to_target(&expenses, 10);
         assert!(below.is_ok());
-        assert!(below.unwrap().is_empty());
+        assert_eq!(below.unwrap(), Vec::<&Expense>::new());
 
         let reachable = closest_subset_to_target(&expenses, 5);
         assert!(reachable.is_ok());
